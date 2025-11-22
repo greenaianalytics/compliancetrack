@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { signIn, getSession } from '@/lib/auth'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -11,8 +12,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/dashboard'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,37 +19,22 @@ export default function LoginPage() {
     setError('')
 
     try {
-      console.log('Attempting login for:', email)
       const { data, error } = await signIn(email, password)
       
       if (error) {
-        console.error('Login error:', error)
         setError(error.message)
       } else {
-        console.log('Login successful, waiting for session...')
-        
-        // Wait for session to be properly set
-        let session = null
-        let attempts = 0
-        while (!session && attempts < 10) {
-          session = await getSession()
-          if (!session) {
-            await new Promise(resolve => setTimeout(resolve, 200))
-            attempts++
-          }
-        }
-
+        // Check if session is created
+        const session = await getSession()
         if (session) {
-          console.log('Session confirmed, redirecting to:', redirectTo)
-          // Use router.replace to avoid adding to history stack
-          router.replace(redirectTo)
+          console.log('Login successful, redirecting to dashboard')
+          router.push('/dashboard')
+          router.refresh()
         } else {
-          console.error('No session created after login')
-          setError('Login successful but session not created. Please refresh the page.')
+          setError('Login successful but no session created. Please try again.')
         }
       }
     } catch (err: any) {
-      console.error('Unexpected login error:', err)
       setError(err.message || 'An unexpected error occurred')
     } finally {
       setLoading(false)
@@ -58,18 +42,30 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-6">
+        {/* Header with Large Logo */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Compliance Track
+          <div className="flex justify-center mb-2">
+            <div className="w-32 h-32 relative">
+              <Image
+                src="/logo.png"
+                alt="Compliance Track Logo"
+                width={128}
+                height={128}
+                className="rounded-lg"
+                priority
+              />
+            </div>
+          </div>
+          <h1 className="text-xl font-bold text-green-900">
+            Compliance Tracker by GreenAI Analytics
           </h1>
-          <h2 className="text-xl text-gray-600 mb-8">Sign in to your account</h2>
+          <p className="text-lg text-gray-600 mt-2">Sign in to your account</p>
         </div>
 
         {/* Login Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
               {error}

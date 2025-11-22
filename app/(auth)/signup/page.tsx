@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { signUp } from '@/lib/auth'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function SignupPage() {
   const [email, setEmail] = useState('')
@@ -44,13 +45,25 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full space-y-6">
           <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Compliance Track
+            <div className="flex justify-center mb-2">
+              <div className="w-32 h-32 relative">
+                <Image
+                  src="/logo.png"
+                  alt="Compliance Track Logo"
+                  width={128}
+                  height={128}
+                  className="rounded-lg"
+                  priority
+                />
+              </div>
+            </div>
+            <h1 className="text-xl font-bold text-green-900">
+              Compliance Tracker
             </h1>
-            <h2 className="text-xl text-gray-600 mb-8">Check your email</h2>
+            <h2 className="text-lg text-gray-600 mt-2">Check your email</h2>
           </div>
 
           <div className="bg-white p-6 rounded-lg shadow-sm border">
@@ -81,18 +94,30 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* Header */}
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-6">
+        {/* Header with Large Logo */}
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Compliance Track
+          <div className="flex justify-center mb-2">
+            <div className="w-32 h-32 relative">
+              <Image
+                src="/logo.png"
+                alt="Compliance Track Logo"
+                width={128}
+                height={128}
+                className="rounded-lg"
+                priority
+              />
+            </div>
+          </div>
+          <h1 className="text-xl font-bold text-green-900">
+            Compliance Tracker Sign Up
           </h1>
-          <h2 className="text-xl text-gray-600">Create your account</h2>
+          <p className="text-lg text-gray-600 mt-2">Create your account</p>
         </div>
 
         {/* Signup Form */}
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
               {error}
