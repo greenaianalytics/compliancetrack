@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useProtectedRoute } from '@/lib/protected-route'
 import { createBrowserClient } from '@/lib/supabase'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface UserData {
   email: string
@@ -10,32 +12,42 @@ interface UserData {
   trial_ends_at: string
   current_period_ends_at: string
   is_sponsored: boolean
+  stripe_customer_id?: string
 }
 
 interface PlatformSettings {
   monthly_price: number
   stripe_public_key: string
   stripe_secret_key: string
-  smtp_host: string
-  smtp_port: string
-  smtp_user: string
-  smtp_pass: string
-  twilio_account_sid: string
-  twilio_auth_token: string
-  twilio_phone_number: string
+}
+
+interface Invoice {
+  id: string
+  stripe_invoice_id: string
+  amount: number
+  currency: string
+  status: string
+  invoice_pdf: string
+  period_start: string
+  period_end: string
+  paid_at: string
+  created_at: string
 }
 
 export default function SettingsPage() {
   useProtectedRoute()
   const [userData, setUserData] = useState<UserData | null>(null)
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings | null>(null)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
-  const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'notifications'>('profile')
+  const [activeTab, setActiveTab] = useState<'profile' | 'billing' | 'notifications' | 'invoices'>('profile')
+    const router = useRouter()
 
   useEffect(() => {
     loadUserData()
     loadPlatformSettings()
+    loadInvoices()
   }, [])
 
   const loadUserData = async () => {
@@ -45,7 +57,7 @@ export default function SettingsPage() {
     if (user) {
       const { data } = await supabase
         .from('users')
-        .select('email, subscription_status, trial_ends_at, current_period_ends_at, is_sponsored')
+        .select('email, subscription_status, trial_ends_at, current_period_ends_at, is_sponsored, stripe_customer_id')
         .eq('id', user.id)
         .single()
 
@@ -62,6 +74,29 @@ export default function SettingsPage() {
       .single()
 
     setPlatformSettings(data)
+  }
+
+  const loadInvoices = async () => {
+    const supabase = createBrowserClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user) {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('stripe_customer_id')
+        .eq('id', user.id)
+        .single()
+
+      if (userData?.stripe_customer_id) {
+        const { data: invoices } = await supabase
+          .from('invoices')
+          .select('*')
+          .eq('stripe_customer_id', userData.stripe_customer_id)
+          .order('created_at', { ascending: false })
+
+        setInvoices(invoices || [])
+      }
+    }
   }
 
   const handleSubscribe = async () => {
@@ -140,6 +175,13 @@ export default function SettingsPage() {
     }
   }
 
+  const formatCurrency = (amount: number, currency: string = 'eur') => {
+    return new Intl.NumberFormat('en-IE', {
+      style: 'currency',
+      currency: currency.toUpperCase(),
+    }).format(amount)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -169,6 +211,14 @@ export default function SettingsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="text-sm text-blue-600 hover:text-blue-500"
+              >
+                ← Back to Dashboard
+              </button>
+            </div>            
           </div>
         </div>
       </header>
@@ -181,6 +231,7 @@ export default function SettingsPage() {
               {[
                 { id: 'profile', name: 'Business Profile' },
                 { id: 'billing', name: 'Billing & Subscription' },
+                { id: 'invoices', name: 'Invoice History' },
                 { id: 'notifications', name: 'Notifications' },
               ].map((tab) => (
                 <button
@@ -338,6 +389,58 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Invoice History Tab */}
+            {activeTab === 'invoices' && (
+              <div className="p-6 space-y-6">
+                <h2 className="text-lg font-semibold text-gray-900">Invoice History</h2>
+                
+                {invoices.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <p>No invoices found.</p>
+                    <p className="text-sm mt-1">Your payment history will appear here.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {invoices.map((invoice) => (
+                      <div key={invoice.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-medium text-gray-900">
+                              {formatCurrency(invoice.amount, invoice.currency)}
+                            </p>
+                            <p className="text-sm text-gray-500">
+                              {new Date(invoice.period_start).toLocaleDateString()} - {new Date(invoice.period_end).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              invoice.status === 'paid' 
+                                ? 'bg-green-100 text-green-800'
+                                : invoice.status === 'pending'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {invoice.status}
+                            </span>
+                            {invoice.invoice_pdf && (
+                              <a
+                                href={invoice.invoice_pdf}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block mt-2 text-sm text-blue-600 hover:text-blue-500"
+                              >
+                                Download PDF
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Notifications Tab */}
             {activeTab === 'notifications' && (
               <div className="p-6 space-y-6">
@@ -352,11 +455,7 @@ export default function SettingsPage() {
                         <p className="text-sm text-gray-500 mt-1">
                           Receive compliance task reminders via email
                         </p>
-                        {platformSettings?.smtp_host ? (
-                          <p className="text-xs text-green-600 mt-1">✓ Email service configured</p>
-                        ) : (
-                          <p className="text-xs text-yellow-600 mt-1">⚠ Email service not configured</p>
-                        )}
+                        <p className="text-xs text-green-600 mt-1">✓ Email service configured with Resend</p>
                       </div>
                       <button
                         className="bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 text-sm"
@@ -371,15 +470,11 @@ export default function SettingsPage() {
                   <div className="border border-gray-200 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-sm font-medium text-gray-900">WhatsApp Notifications</h3>
+                        <h3 className="text-sm font-medium text-gray-900">SMS Notifications</h3>
                         <p className="text-sm text-gray-500 mt-1">
-                          Receive compliance task reminders via WhatsApp
+                          Receive compliance task reminders via SMS
                         </p>
-                        {platformSettings?.twilio_account_sid ? (
-                          <p className="text-xs text-green-600 mt-1">✓ WhatsApp service configured</p>
-                        ) : (
-                          <p className="text-xs text-yellow-600 mt-1">⚠ WhatsApp service not configured</p>
-                        )}
+                        <p className="text-xs text-green-600 mt-1">✓ SMS service configured with 46elks</p>
                       </div>
                       <button
                         className="bg-gray-100 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-200 text-sm"

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { sendTaskReminders, sendUrgentTaskNotifications } from '@/lib/reminder-service'
+import { createServerClient } from '@/lib/supabase'
 
 export async function GET(request: NextRequest) {
   // Check for secret token for security
@@ -9,23 +9,26 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    console.log('Starting reminder cron job...')
+    // Test database connection
+    const supabase = createServerClient()
+    const { data, error } = await supabase
+      .from('platform_settings')
+      .select('monthly_price')
+      .limit(1)
 
-    // Send regular reminders for upcoming tasks
-    await sendTaskReminders()
-    
-    // Send urgent notifications for tasks due today
-    await sendUrgentTaskNotifications()
+    if (error) {
+      throw new Error(`Database health check failed: ${error.message}`)
+    }
 
-    console.log('Reminder cron job completed successfully')
-    
     return NextResponse.json({ 
       success: true, 
-      message: 'Reminder notifications processed successfully' 
+      message: 'Health check passed',
+      database: 'connected',
+      timestamp: new Date().toISOString()
     })
 
   } catch (error) {
-    console.error('Error in reminder cron job:', error)
+    console.error('Health check failed:', error)
     return NextResponse.json({ 
       success: false, 
       error: error.message 

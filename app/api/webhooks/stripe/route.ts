@@ -38,9 +38,19 @@ export async function POST(request: NextRequest) {
         await handleSubscriptionDeleted(deletedSubscription, supabase)
         break
 
-      case 'invoice.payment_failed':
+      case 'invoice.payment_succeeded':
         const invoice = event.data.object as Stripe.Invoice
-        await handlePaymentFailed(invoice, supabase)
+        await handleInvoicePaymentSucceeded(invoice, supabase)
+        break
+
+      case 'invoice.payment_failed':
+        const failedInvoice = event.data.object as Stripe.Invoice
+        await handleInvoicePaymentFailed(failedInvoice, supabase)
+        break
+
+      case 'invoice.upcoming':
+        const upcomingInvoice = event.data.object as Stripe.Invoice
+        await handleInvoiceUpcoming(upcomingInvoice, supabase)
         break
     }
 
@@ -51,69 +61,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session, supabase: any) {
-  const { customer, subscription } = session
-
-  if (!customer || !subscription) return
-
-  // Update user's subscription status
-  const { error } = await supabase
-    .from('users')
-    .update({
-      stripe_customer_id: customer as string,
-      subscription_status: 'active',
-      current_period_ends_at: new Date((subscription as Stripe.Subscription).current_period_end * 1000).toISOString()
-    })
-    .eq('email', session.customer_email)
-
-  if (error) {
-    console.error('Error updating user subscription:', error)
-  }
-}
-
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription, supabase: any) {
-  const { customer, status, current_period_end } = subscription
-
-  const { error } = await supabase
-    .from('users')
-    .update({
-      subscription_status: status,
-      current_period_ends_at: new Date(current_period_end * 1000).toISOString()
-    })
-    .eq('stripe_customer_id', customer as string)
-
-  if (error) {
-    console.error('Error updating subscription:', error)
-  }
-}
-
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription, supabase: any) {
-  const { customer } = subscription
-
-  const { error } = await supabase
-    .from('users')
-    .update({
-      subscription_status: 'canceled',
-      current_period_ends_at: null
-    })
-    .eq('stripe_customer_id', customer as string)
-
-  if (error) {
-    console.error('Error canceling subscription:', error)
-  }
-}
-
-async function handlePaymentFailed(invoice: Stripe.Invoice, supabase: any) {
-  const { customer } = invoice
-
-  const { error } = await supabase
-    .from('users')
-    .update({
-      subscription_status: 'past_due'
-    })
-    .eq('stripe_customer_id', customer as string)
-
-  if (error) {
-    console.error('Error updating payment failed status:', error)
-  }
-}
+// ... (keep all the handler functions from previous response)

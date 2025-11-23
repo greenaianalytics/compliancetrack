@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createCheckoutSession } from '@/lib/stripe'
 import { createServerClient } from '@/lib/supabase'
 
 export async function POST(request: NextRequest) {
@@ -11,92 +12,68 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's current subscription status
-    const { data: userData, error: userError } = await supabase
+    const { data: userData } = await supabase
       .from('users')
       .select('subscription_status, stripe_customer_id, is_sponsored')
       .eq('id', user.id)
       .single()
 
-    if (userError) {
-      console.error('Error fetching user data:', userError)
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Check if user is sponsored
-    if (userData.is_sponsored) {
+    if (userData?.is_sponsored) {
       return NextResponse.json({ error: 'Sponsored accounts do not require payment' }, { status: 400 })
     }
 
-    // Get platform settings for price and trial days
-    const { data: platformSettings, error: settingsError } = await supabase
+    // Get platform settings for price
+    const { data: platformSettings } = await supabase
       .from('platform_settings')
-      .select('monthly_price, trial_days, stripe_secret_key')
+      .select('monthly_price')
       .single()
 
-    if (settingsError || !platformSettings) {
-      console.error('Error fetching platform settings:', settingsError)
-      return NextResponse.json({ error: 'Platform configuration error' }, { status: 500 })
-    }
-
     const price = platformSettings?.monthly_price || 29.99
-    const trialDays = platformSettings?.trial_days || 30
 
-    // Check if Stripe is configured
-    if (!platformSettings.stripe_secret_key) {
-      return NextResponse.json({ error: 'Stripe is not configured. Please contact support.' }, { status: 500 })
-    }
-
-    // Import Stripe dynamically with the configured secret key
-    const stripe = require('stripe')(platformSettings.stripe_secret_key)
-
-    // Create a Stripe Price for this amount
-    let priceData
-    try {
-      priceData = await stripe.prices.create({
-        unit_amount: Math.round(price * 100), // Convert to cents
-        currency: 'eur',
-        recurring: {
-          interval: 'month',
-        },
-        product_data: {
-          name: 'Compliance Track Monthly Subscription',
-          description: 'Full access to compliance tracking and management features',
-        },
-      })
-    } catch (stripeError: any) {
-      console.error('Stripe price creation error:', stripeError)
-      return NextResponse.json({ error: 'Payment configuration error: ' + stripeError.message }, { status: 500 })
-    }
-
-    const successUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/payment/success?session_id={CHECKOUT_SESSION_ID}`
-    const cancelUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/settings`
-
-    // Create Stripe checkout session
-    let session
-    try {
-      session = await stripe.checkout.sessions.create({
-        customer: userData.stripe_customer_id || undefined,
-        line_items: [
-          {
-            price: priceData.id,
-            quantity: 1,
-          },
-        ],
-        mode: 'subscription',
-        success_url: successUrl,
-        cancel_url: cancelUrl,
-        subscription_data: {
-          trial_period_days: trialDays,
-        },
-        customer_email: userData.stripe_customer_id ? undefined : user.email,
+    // Create a Stripe Price for recurring billing
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
+    const priceData = await stripe.prices.create({
+      unit_amount: Math.round(price * 100), // Convert to cents
+      currency: 'eur',
+      recurring: {
+        interval: 'month',
+      },
+      product_data: {
+        name: 'Compliance Track Monthly Subscription',
         metadata: {
-          userId: user.id,
+          description: 'Monthly access to compliance tracking and management'
         },
-      })
-    } catch (sessionError: any) {
-      console.error('Stripe session creation error:', sessionError)
-      return NextResponse.json({ error: 'Checkout session error: ' + sessionError.message }, { status: 500 })
-    }
+      },
+    })
+
+    const successUrl = `${process.env.NEXTAUTH_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`
+    const cancelUrl = `${process.env.NEXTAUTH_URL}/settings`
+
+    // Create checkout session with subscription
+    const session = await stripe.checkout.sessions.create({
+      customer: userData?.stripe_customer_id || undefined,
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceData.id,
+          quantity: 1,
+        },
+      ],
+      subscription_data: {
+        trial_period_days: userData?.subscription_status === 'trial' ? 0 : 30, // No trial if already had one
+        metadata: {
+          user_id: user.id,
+          plan_type: 'monthly'
+        }
+      },
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      customer_email: userData?.stripe_customer_id ? undefined : user.email,
+      metadata: {
+        user_id: user.id,
+      },
+    })
 
     return NextResponse.json({ sessionId: session.id })
   } catch (error) {
