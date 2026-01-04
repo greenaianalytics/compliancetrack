@@ -1,13 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { getCurrentUser, signOut } from '@/lib/auth'
 import { createBrowserClient } from '@/lib/supabase'
 import { calculateHealthScore, formatTaskName } from '@/lib/utils'
 import HealthSpeedometer from '@/components/health-speedometer'
 import ConfirmCompletionModal from '@/components/confirm-completion-modal'
-import YearSelector from '@/components/year-selector' // Add this import
+import Header from '@/components/header'
 
 interface Task {
   id: string
@@ -21,7 +21,6 @@ interface Task {
   created_by?: string
   evidence_required?: boolean
   weekend_policy?: string
-  task_year: number // Add year field
 }
 
 interface HealthScore {
@@ -35,8 +34,6 @@ export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [smeProfile, setSmeProfile] = useState<any>(null)
   const [tasks, setTasks] = useState<Task[]>([])
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
-  const [availableYears, setAvailableYears] = useState<number[]>([])
   const [healthScore, setHealthScore] = useState<HealthScore>({
     overall: 0,
     completed: 0,
@@ -45,7 +42,6 @@ export default function DashboardPage() {
   })
   const [loading, setLoading] = useState(true)
   const router = useRouter()
-  const searchParams = useSearchParams()
 
   const [completionModal, setCompletionModal] = useState<{
     isOpen: boolean
@@ -59,27 +55,9 @@ export default function DashboardPage() {
     dueDate: ''
   })
 
-  // Initialize from URL parameter
-  useEffect(() => {
-    const yearParam = searchParams.get('year')
-    if (yearParam) {
-      const year = parseInt(yearParam)
-      if (!isNaN(year)) {
-        setSelectedYear(year)
-      }
-    }
-  }, [searchParams])
-
   useEffect(() => {
     loadDashboardData()
   }, [])
-
-  // Reload tasks when year changes
-  useEffect(() => {
-    if (user && selectedYear) {
-      loadTasks(user.id, selectedYear)
-    }
-  }, [selectedYear])
 
   const loadDashboardData = async () => {
     try {
@@ -87,7 +65,7 @@ export default function DashboardPage() {
       setUser(currentUser)
 
       if (currentUser) {
-        await loadTasks(currentUser.id, selectedYear)
+        await loadTasks(currentUser.id)
       }
     } catch (error) {
       console.error('Error loading dashboard:', error)
@@ -96,24 +74,7 @@ export default function DashboardPage() {
     }
   }
 
-  // Load available years for this SME
-  const loadAvailableYears = async (smeId: string) => {
-    const supabase = createBrowserClient()
-    const { data } = await supabase
-      .from('sme_compliance_status')
-      .select('task_year')
-      .eq('sme_id', smeId)
-      .order('task_year', { ascending: false })
-
-    if (data) {
-      const years = [...new Set(data.map(item => item.task_year))]
-      setAvailableYears(years.length > 0 ? years : [selectedYear])
-    }
-  }
-
-  // Update loadTasks to filter by year
-  const loadTasks = async (userId: string, year?: number) => {
-    const taskYear = year || selectedYear
+  const loadTasks = async (userId: string) => {
     const supabase = createBrowserClient()
     
     // Get user's SME profile to find their organization
@@ -129,16 +90,14 @@ export default function DashboardPage() {
     }
 
     setSmeProfile(smeProfile)
-    await loadAvailableYears(smeProfile.id) // Load available years
 
-    // Load both compliance tasks and custom tasks for the organization and selected year
+    // Load both compliance tasks and custom tasks for the organization
     const { data: complianceTasks, error: complianceError } = await supabase
       .from('sme_compliance_status')
       .select(`
         id,
         status,
         due_date,
-        task_year,
         completed_at,
         compliance_tasks (
           id,
@@ -151,13 +110,11 @@ export default function DashboardPage() {
         )
       `)
       .eq('sme_id', smeProfile.id)
-      .eq('task_year', taskYear) // Filter by year
 
     const { data: customTasks, error: customError } = await supabase
       .from('custom_tasks')
       .select('*')
       .eq('sme_id', smeProfile.id)
-      .eq('task_year', taskYear) // Filter custom tasks by year too
 
     if (complianceError) console.error('Error loading compliance tasks:', complianceError)
     if (customError) console.error('Error loading custom tasks:', customError)
@@ -179,14 +136,12 @@ export default function DashboardPage() {
             priority: task.compliance_tasks.priority,
             is_custom: false,
             evidence_required: task.compliance_tasks.evidence_required,
-            weekend_policy: task.compliance_tasks.weekend_policy,
-            task_year: task.task_year
+            weekend_policy: task.compliance_tasks.weekend_policy
           })
         }
       })
     }
 
-    // Add custom tasks
     if (customTasks) {
       customTasks.forEach(task => {
         allTasks.push({
@@ -200,8 +155,7 @@ export default function DashboardPage() {
           is_custom: true,
           created_by: task.created_by,
           evidence_required: task.evidence_required || false,
-          weekend_policy: 'next_business_day', // Default for custom tasks
-          task_year: task.task_year || taskYear
+          weekend_policy: 'next_business_day' // Default for custom tasks
         })
       })
     }
@@ -268,7 +222,7 @@ export default function DashboardPage() {
     }
 
     // Reload tasks to reflect changes
-    await loadTasks(user.id, selectedYear)
+    await loadTasks(user.id)
   }
 
   const handleCompleteClick = (taskId: string, taskName: string, dueDate: string) => {
@@ -299,13 +253,7 @@ export default function DashboardPage() {
   }
 
   const handleAddCustomTask = () => {
-    router.push(`/tasks?action=create&year=${selectedYear}`)
-  }
-
-  const handleYearChange = (year: number) => {
-    setSelectedYear(year)
-    // Update URL without page reload
-    router.push(`/dashboard?year=${year}`, { scroll: false })
+    router.push('/tasks?action=create')
   }
 
   if (loading) {
@@ -319,68 +267,50 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo only - no text */}
-            <div className="flex items-center">
-              <img 
-                src="/logo.png" 
-                alt="Compliance Track" 
-                className="h-10 w-auto" // Adjust height as needed for your rectangular logo
-              />
-            </div>
-            <div className="flex items-center space-x-4">
-              {/* Year Selector */}
-              <YearSelector
-                currentYear={selectedYear}
-                availableYears={availableYears}
-                onYearChange={handleYearChange}
-              />
-              
-              <span className="text-sm text-gray-600">
-                Welcome, {user?.email}
-              </span>
-              <button
-                onClick={() => router.push('/settings')}
-                className="text-sm text-blue-600 hover:text-blue-500"
-              >
-                Settings
-              </button>
-              <button
-                onClick={async () => {
-                  await signOut()
-                  window.location.href = '/login'
-                }}
-                className="text-sm text-blue-600 hover:text-blue-500"
-              >
-                Sign out
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+<header className="bg-white shadow-sm border-b">
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="flex justify-between items-center h-16">
+      {/* Logo only - no text */}
+      <div className="flex items-center">
+        <img 
+          src="/logo.png" 
+          alt="Compliance Track" 
+          className="h-10 w-auto" // Adjust height as needed for your rectangular logo
+        />
+      </div>
+      <div className="flex items-center space-x-4">
+        <span className="text-sm text-gray-600">
+          Welcome, {user?.email}
+        </span>
+        <button
+          onClick={() => router.push('/settings')}
+          className="text-sm text-blue-600 hover:text-blue-500"
+        >
+          Settings
+        </button>
+        <button
+          onClick={async () => {
+            await signOut()
+            window.location.href = '/login'
+          }}
+          className="text-sm text-blue-600 hover:text-blue-500"
+        >
+          Sign out
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
 
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="mb-4 flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">
-              Dashboard - {selectedYear}
-            </h1>
-            {smeProfile && (
-              <p className="text-sm text-gray-600">
-                Business: {smeProfile.business_name}
-              </p>
-            )}
-          </div>
-          
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Health Score & Tasks */}
             <div className="lg:col-span-2 space-y-6">
               {/* Health Score Card */}
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-6">
-                  Compliance Health Score - {selectedYear}
+                  Compliance Health Score
                 </h2>
                 <div className="flex flex-col lg:flex-row items-center justify-between">
                   <div className="lg:mr-8 mb-6 lg:mb-0">
@@ -436,11 +366,11 @@ export default function DashboardPage() {
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold text-gray-900">
-                    All Tasks ({tasks.length}) - {selectedYear}
+                    All Tasks ({tasks.length})
                   </h2>
                   <div className="flex space-x-2">
                     <button 
-                      onClick={() => router.push(`/tasks?year=${selectedYear}`)}
+                      onClick={() => router.push('/tasks')}
                       className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
                     >
                       View All Tasks
@@ -456,7 +386,7 @@ export default function DashboardPage() {
                 
                 {tasks.length === 0 ? (
                   <div className="text-center py-8 text-gray-500">
-                    <p>No tasks found for {selectedYear}.</p>
+                    <p>No tasks found.</p>
                     <button 
                       onClick={handleAddCustomTask}
                       className="mt-2 text-blue-600 hover:text-blue-500"
@@ -504,21 +434,21 @@ export default function DashboardPage() {
                           </div>
                           
                           {/* Weekend Policy and Evidence Required - Compact single line */}
-                          <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-gray-100 flex-nowrap overflow-x-auto">
-                            {/* Evidence Required Badge */}
-                            {task.evidence_required && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 whitespace-nowrap flex-shrink-0 min-w-0">
-                                📎 Evidence Required
-                              </span>
+<div className="flex items-center space-x-2 mt-3 pt-3 border-t border-gray-100 flex-nowrap overflow-x-auto">
+  {/* Evidence Required Badge */}
+  {task.evidence_required && (
+    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 whitespace-nowrap flex-shrink-0 min-w-0">
+      📎 Evidence Required
+    </span>
                             )}
                             
-                            {/* Weekend Policy Badge */}
-                            {task.weekend_policy && task.weekend_policy !== 'ignore' && (
-                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap flex-shrink-0 min-w-0">
-                                {task.weekend_policy === 'previous_business_day' ? '📅 Prev business day' : 
-                                 task.weekend_policy === 'next_business_day' ? '📅 Next business day' : 
-                                 `📅 ${task.weekend_policy}`}
-                              </span>
+                              {/* Weekend Policy Badge */}
+  {task.weekend_policy && task.weekend_policy !== 'ignore' && (
+    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap flex-shrink-0 min-w-0">
+      {task.weekend_policy === 'previous_business_day' ? '📅 Prev business day' : 
+       task.weekend_policy === 'next_business_day' ? '📅 Next business day' : 
+       `📅 ${task.weekend_policy}`}
+    </span>
                             )}
                             
                             {/* Show if no special badges */}
@@ -547,7 +477,7 @@ export default function DashboardPage() {
                     {tasks.length > 10 && (
                       <div className="text-center pt-4">
                         <button 
-                          onClick={() => router.push(`/tasks?year=${selectedYear}`)}
+                          onClick={() => router.push('/tasks')}
                           className="text-blue-600 hover:text-blue-500 font-medium"
                         >
                           View all {tasks.length} tasks →
@@ -611,7 +541,7 @@ export default function DashboardPage() {
               {/* Quick Stats */}
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Quick Stats - {selectedYear}
+                  Quick Stats
                 </h2>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
@@ -636,10 +566,6 @@ export default function DashboardPage() {
                       {tasks.filter(t => t.status === 'hidden').length}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">Health Score</span>
-                    <span className="text-sm font-medium text-gray-900">{healthScore.overall}%</span>
-                  </div>
                 </div>
               </div>
 
@@ -650,7 +576,7 @@ export default function DashboardPage() {
                 </h2>
                 <div className="space-y-2">
                   <button
-                    onClick={() => router.push(`/tasks?year=${selectedYear}`)}
+                    onClick={() => router.push('/tasks')}
                     className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
                   >
                     📋 View All Tasks
@@ -662,7 +588,7 @@ export default function DashboardPage() {
                     ➕ Add Custom Task
                   </button>
                   <button
-                    onClick={() => router.push(`/calendar?year=${selectedYear}`)}
+                    onClick={() => router.push('/calendar')}
                     className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md transition-colors"
                   >
                     📅 View Calendar
