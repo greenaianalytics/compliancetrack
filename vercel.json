@@ -1,78 +1,55 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "framework": "nextjs",
-  "functions": {
-    "app/api/cron/**/*.ts": {
-      "maxDuration": 60
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
     }
-  },
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Authorization"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1",
+      "headers": {
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "origin-when-cross-origin",
+        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+        "X-DNS-Prefetch-Control": "on"
+      }
+    }
+  ],
   "env": {
-    "NODE_ENV": "production"
+    "ENABLE_EXPERIMENTAL_COREPACK": "1"
   },
-  "regions": ["fra1"],  // Frankfurt, EU region for GDPR compliance
-  "crons": [
-    {
-      "path": "/api/cron/reminders",
-      "schedule": "0 9 * * *"
+  "functions": {
+    "app/api/**/*": {
+      "maxDuration": 30,
+      "memory": 1024
     },
-    {
-      "path": "/api/cron/health-check",
-      "schedule": "0 * * * *"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=()"
-        }
-      ]
+    "app/api/email/**/*": {
+      "maxDuration": 60,
+      "memory": 1536
     },
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
-        }
-      ]
-    },
-    {
-      "source": "/(.*\\.(ico|png|jpg|jpeg|gif|webp|svg|css|js|woff|woff2|ttf|eot))",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
+    "app/api/admin/**/*": {
+      "maxDuration": 30,
+      "memory": 1024
     }
-  ],
-  "redirects": [
-    {
-      "source": "/admin",
-      "destination": "/admin/login",
-      "permanent": false
+  },
+  "regions": ["fra1"], // Frankfurt for EU compliance
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "develop": true
     }
-  ]
+  }
 }
