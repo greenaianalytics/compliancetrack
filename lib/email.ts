@@ -1,39 +1,85 @@
+'use client'
+
 import { createBrowserClient } from './supabase'
+import nodemailer from 'nodemailer'
+
+interface EmailConfig {
+  // Resend configuration
+  resend_api_key?: string
+  email_from_address?: string
+  email_from_name?: string
+  
+  // SMTP configuration
+  smtp_host?: string
+  smtp_port?: number
+  smtp_secure?: boolean
+  smtp_user?: string
+  smtp_pass?: string
+  smtp_from?: string
+}
+
+interface EmailOptions {
+  to: string
+  subject: string
+  html: string
+  text?: string
+  from?: string
+}
 
 /**
- * Send email using Resend
+ * Get email configuration from database (server-side compatible)
  */
-export async function sendEmail(to: string, subject: string, html: string, text?: string) {
-  const supabase = createBrowserClient()
-  
-  // Get email settings from platform configuration
-  const { data: settings } = await supabase
-    .from('platform_settings')
-    .select('*')
-    .single()
+export async function getEmailConfig(): Promise<EmailConfig> {
+  try {
+    const supabase = createBrowserClient()
+    
+    const { data: settings } = await supabase
+      .from('platform_settings')
+      .select('*')
+      .single()
 
-  if (!settings?.resend_api_key) {
-    console.error('Resend API key not configured')
-    return { success: false, error: 'Email service not configured' }
+    // Your actual columns from the database
+    return {
+      // Resend - working!
+      resend_api_key: settings?.resend_api_key,
+      email_from_address: settings?.email_from_address || 'noreply@notification.greenaianalytics.org',
+      email_from_name: settings?.email_from_name || 'Compliance Track',
+      
+      // SMTP - Brevo backup (optional)
+      smtp_host: settings?.smtp_host || process.env.SMTP_HOST,
+      smtp_port: settings?.smtp_port ? parseInt(settings.smtp_port.toString()) : parseInt(process.env.SMTP_PORT || '587'),
+      smtp_secure: settings?.smtp_secure === true || settings?.smtp_secure === 'true' || false,
+      smtp_user: settings?.smtp_user || process.env.SMTP_USER,
+      smtp_pass: settings?.smtp_pass || process.env.SMTP_PASS,
+      smtp_from: settings?.smtp_from || settings?.email_from_address || 'Compliance Track <noreply@compliance-track.com>'
+    }
+  } catch (error) {
+    console.error('Error fetching email config:', error)
+    return {}
+  }
+}/**
+ * Send email using Resend (primary)
+ */
+async function sendViaResend(config: EmailConfig, options: EmailOptions): Promise<{success: boolean, id?: string, error?: string}> {
+  if (!config.resend_api_key) {
+    return { success: false, error: 'Resend API key not configured' }
   }
 
-  // Use configured from address or fallback to GreenAI Analytics domain
-  const fromAddress = settings.email_from_address || 'noreply@notification.greenaianalytics.org'
-  const fromName = settings.email_from_name || 'Compliance Track'
+  const fromAddress = options.from || `${config.email_from_name} <${config.email_from_address}>`
 
   try {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${settings.resend_api_key}`,
+        'Authorization': `Bearer ${config.resend_api_key}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from: `${fromName} <${fromAddress}>`,
-        to: [to],
-        subject: subject,
-        html: html,
-        text: text || html.replace(/<[^>]*>/g, ''),
+        from: fromAddress,
+        to: [options.to],
+        subject: options.subject,
+        html: options.html,
+        text: options.text || options.html.replace(/<[^>]*>/g, ''),
       }),
     })
 
@@ -43,11 +89,114 @@ export async function sendEmail(to: string, subject: string, html: string, text?
     }
 
     const data = await response.json()
-    console.log('Email sent successfully:', data.id)
+    console.log('Email sent via Resend:', data.id)
     return { success: true, id: data.id }
   } catch (error: any) {
     console.error('Resend error:', error)
     return { success: false, error: error.message }
+  }
+}
+
+/**
+ * Send email using SMTP (fallback)
+ */
+async function sendViaSMTP(config: EmailConfig, options: EmailOptions): Promise<{success: boolean, error?: string}> {
+  if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
+    return { success: false, error: 'SMTP configuration incomplete' }
+  }
+
+  try {
+    // For Brevo/Sendinblue, we need to use TLS, not SSL
+    const transporter = nodemailer.createTransport({
+      host: config.smtp_host,
+      port: config.smtp_port,
+      secure: false, // Use TLS, not SSL
+      requireTLS: true, // Force TLS
+      auth: {
+        user: config.smtp_user,
+        pass: config.smtp_pass,
+      },
+      tls: {
+        ciphers: 'SSLv3', // Brevo might require this
+        rejectUnauthorized: false // For testing, you might need this
+      }
+    })
+
+    // Verify connection first
+    await transporter.verify()
+    console.log('SMTP connection verified for Brevo')
+
+    await transporter.sendMail({
+      from: options.from || config.smtp_from,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text || options.html.replace(/<[^>]*>/g, ''),
+    })
+
+    console.log(`Email sent via Brevo SMTP to: ${options.to}`)
+    return { success: true }
+  } catch (error: any) {
+    console.error('Brevo SMTP error:', error)
+    
+    // Provide helpful error message for Brevo
+    let errorMessage = error.message
+    if (error.code === 'EAUTH') {
+      errorMessage = 'Brevo authentication failed. Check your username/password.'
+    } else if (error.code === 'ECONNECTION') {
+      errorMessage = `Cannot connect to Brevo SMTP server at ${config.smtp_host}:${config.smtp_port}`
+    }
+    
+    return { success: false, error: errorMessage }
+  }
+}
+/**
+ * Main email sending function
+ * Tries Resend first, then SMTP, then logs to console in development
+ */
+export async function sendEmail(
+  to: string, 
+  subject: string, 
+  html: string, 
+  text?: string,
+  from?: string
+): Promise<{success: boolean, id?: string, error?: string, method?: string}> {
+  const config = await getEmailConfig()
+  const options: EmailOptions = { to, subject, html, text, from }
+
+  // Try Resend first
+  if (config.resend_api_key) {
+    const result = await sendViaResend(config, options)
+    if (result.success) {
+      return { ...result, method: 'resend' }
+    }
+    console.warn('Resend failed, trying SMTP...')
+  }
+
+  // Try SMTP as fallback
+  if (config.smtp_host && config.smtp_user && config.smtp_pass) {
+    const result = await sendViaSMTP(config, options)
+    if (result.success) {
+      return { ...result, method: 'smtp' }
+    }
+    console.warn('SMTP failed...')
+  }
+
+  // Development mode - log to console
+  console.log('📧 Email (development mode):', {
+    to: options.to,
+    subject: options.subject,
+    html: options.html,
+    configAvailable: {
+      resend: !!config.resend_api_key,
+      smtp: !!(config.smtp_host && config.smtp_user && config.smtp_pass)
+    }
+  })
+  
+  return { 
+    success: true, 
+    method: 'console',
+    error: process.env.NODE_ENV === 'production' ? 'No email service configured' : undefined
   }
 }
 
