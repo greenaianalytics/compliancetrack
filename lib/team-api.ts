@@ -116,10 +116,33 @@ export const inviteTeamMember = async (userId: string, inviteData: InviteTeamMem
 export const updateTeamMemberRole = async (adminUserId: string, updateData: UpdateTeamMemberRoleData) => {
   const supabase = createBrowserClient()
   
-  // In a real implementation, you'd update the user's role in your user_roles table
-  // For now, we'll just return success
-  console.log('Updating user role:', updateData)
-  
+  // Verify calling user is an admin
+  const { data: adminProfile, error: adminError } = await supabase
+    .from('sme_profiles')
+    .select('id')
+    .eq('user_id', adminUserId)
+    .single()
+
+  if (adminError || !adminProfile) {
+    throw new Error('Admin profile not found')
+  }
+
+  // Update user role in the database
+  const { error } = await supabase
+    .from('user_roles')
+    .upsert({
+      user_id: updateData.teamMemberId,
+      sme_id: adminProfile.id,
+      role: updateData.role,
+      updated_at: new Date().toISOString()
+    }, { 
+      onConflict: 'user_id,sme_id'
+    })
+
+  if (error) {
+    throw new Error(`Failed to update user role: ${error.message}`)
+  }
+
   return { success: true }
 }
 

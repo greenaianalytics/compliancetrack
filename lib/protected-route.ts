@@ -3,18 +3,19 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser } from './auth'
+import { debugLog } from './debug'
 
 export const useProtectedRoute = () => {
   const router = useRouter()
 
   useEffect(() => {
     const checkAuth = async () => {
-      console.log('Protected route checking auth...')
+      debugLog('ProtectedRoute', 'Checking auth')
       const user = await getCurrentUser()
-      console.log('Protected route user:', user)
+      debugLog('ProtectedRoute', `User: ${user ? user.email : 'none'}`)
       
       if (!user) {
-        console.log('No user found, redirecting to login')
+        debugLog('ProtectedRoute', 'No user, redirecting')
         router.push('/login')
       }
     }

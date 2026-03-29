@@ -1,21 +1,39 @@
 import { ExportData } from '@/types/export'
 
+/**
+ * Generate a PDF blob from export data
+ * Calls the server-side PDF generation endpoint
+ */
 export const generatePDF = async (exportData: ExportData): Promise<Blob> => {
-  // In a real implementation, you would use a PDF library like jsPDF or pdf-lib
-  // For now, we'll create a simple HTML-based PDF using browser print functionality
-  const htmlContent = generatePDFHTML(exportData)
-  
-  // Create a blob from HTML content
-  const blob = new Blob([htmlContent], { type: 'text/html' })
-  return blob
-  
-  // Note: For proper PDF generation in production, consider:
-  // - Using a server-side PDF generation service
-  // - Using a library like jsPDF with html2canvas
-  // - Using a headless browser service
+  try {
+    // Call the server endpoint to generate PDF
+    const response = await fetch('/api/export/generate-pdf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(exportData),
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF')
+    }
+
+    return await response.blob()
+  } catch (error) {
+    console.error('Error generating PDF:', error)
+    
+    // Fallback: return HTML that can be printed to PDF
+    const htmlBlob = generatePDFHTML(exportData)
+    return new Blob([htmlBlob], { type: 'text/html' })
+  }
 }
 
-const generatePDFHTML = (exportData: ExportData): string => {
+/**
+ * Generate HTML string for PDF content
+ * Used for both server-side PDF generation and fallback client-side printing
+ */
+export const generatePDFHTML = (exportData: ExportData): string => {
   const { tasks, summary, metadata } = exportData
   
   const groupedTasks = tasks.reduce((acc, task) => {

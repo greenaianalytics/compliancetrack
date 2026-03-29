@@ -165,10 +165,88 @@ export const generateCSV = (exportData: ExportData): string => {
 }
 
 export const generateExcel = async (exportData: ExportData): Promise<Blob> => {
-  // For Excel export, we'll use a simple CSV approach
-  // In a real implementation, you might use a library like SheetJS
-  const csvContent = generateCSV(exportData)
-  return new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  // Create XLSX-compatible file using Office Open XML format
+  // This is a simplified approach that creates a valid Excel file
+  
+  const { tasks, summary, metadata } = exportData
+  
+  // Create worksheet content in XML format
+  const taskRows = tasks.map((task, index) => `
+    <Row ss:Index="${index + 2}">
+      <Cell><Data ss:Type="String">${escapeXml(task.task_name)}</Data></Cell>
+      <Cell><Data ss:Type="String">${task.type}</Data></Cell>
+      <Cell><Data ss:Type="String">${task.category}</Data></Cell>
+      <Cell><Data ss:Type="String">${task.status}</Data></Cell>
+      <Cell><Data ss:Type="String">${task.priority}</Data></Cell>
+      <Cell><Data ss:Type="String">${new Date(task.due_date).toLocaleDateString()}</Data></Cell>
+      <Cell><Data ss:Type="String">${task.completed_at ? new Date(task.completed_at).toLocaleDateString() : ''}</Data></Cell>
+      <Cell><Data ss:Type="String">${escapeXml(task.description || '')}</Data></Cell>
+      <Cell><Data ss:Type="String">${escapeXml(task.legal_reference || '')}</Data></Cell>
+    </Row>
+  `).join('')
+
+  const excelXML = `<?xml version="1.0" encoding="UTF-8"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+          xmlns:x="urn:schemas-microsoft-com:office:excel"
+          xmlns:x2="http://schemas.microsoft.com/office/excel/2003/xml">
+  <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+    <Title>Compliance Tasks Report - ${metadata.businessName}</Title>
+    <Author>Compliance Track</Author>
+    <Created>${new Date().toISOString()}</Created>
+  </DocumentProperties>
+  
+  <Worksheet ss:Name="Summary">
+    <Table>
+      <Row><Cell ss:StyleID="header"><Data ss:Type="String">Metric</Data></Cell><Cell ss:StyleID="header"><Data ss:Type="String">Value</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="String">Business Name</Data></Cell><Cell><Data ss:Type="String">${metadata.businessName}</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="String">Total Tasks</Data></Cell><Cell><Data ss:Type="Number">${summary.total}</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="String">Completed</Data></Cell><Cell><Data ss:Type="Number">${summary.completed}</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="String">Pending</Data></Cell><Cell><Data ss:Type="Number">${summary.pending}</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="String">Overdue</Data></Cell><Cell><Data ss:Type="Number">${summary.overdue}</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="String">Completion Rate</Data></Cell><Cell><Data ss:Type="String">${summary.completionRate}%</Data></Cell></Row>
+      <Row><Cell><Data ss:Type="String">Exported</Data></Cell><Cell><Data ss:Type="String">${new Date(metadata.exportedAt).toLocaleString()}</Data></Cell></Row>
+    </Table>
+  </Worksheet>
+  
+  <Worksheet ss:Name="Tasks">
+    <Table>
+      <Row ss:StyleID="header">
+        <Cell><Data ss:Type="String">Task Name</Data></Cell>
+        <Cell><Data ss:Type="String">Type</Data></Cell>
+        <Cell><Data ss:Type="String">Category</Data></Cell>
+        <Cell><Data ss:Type="String">Status</Data></Cell>
+        <Cell><Data ss:Type="String">Priority</Data></Cell>
+        <Cell><Data ss:Type="String">Due Date</Data></Cell>
+        <Cell><Data ss:Type="String">Completed Date</Data></Cell>
+        <Cell><Data ss:Type="String">Description</Data></Cell>
+        <Cell><Data ss:Type="String">Legal Reference</Data></Cell>
+      </Row>
+      ${taskRows}
+    </Table>
+  </Worksheet>
+  
+  <Styles>
+    <Style ss:ID="header">
+      <Interior ss:Color="#D3D3D3" ss:Pattern="Solid"/>
+      <Font ss:Bold="1"/>
+    </Style>
+  </Styles>
+</Workbook>`
+
+  return new Blob([excelXML], { type: 'application/vnd.ms-excel' })
+}
+
+/**
+ * Escape XML special characters
+ */
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
 }
 
 export const downloadFile = (content: Blob | string, filename: string, mimeType: string) => {

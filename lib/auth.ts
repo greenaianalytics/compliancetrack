@@ -1,4 +1,5 @@
 import { createBrowserClient } from './supabase'
+import { debugLog, debugError, logError } from './debug'
 
 // Helper to get the base URL (works on both server and client)
 const getBaseUrl = () => {
@@ -24,14 +25,14 @@ export const signIn = async (email: string, password: string) => {
     })
 
     if (error) {
-      console.error('Supabase sign in error:', error)
+      debugError('Auth:SignIn', error)
       throw error
     }
 
-    console.log('Sign in successful:', data)
+    debugLog('Auth:SignIn', 'Success')
     return { data, error: null }
   } catch (error: any) {
-    console.error('Sign in error:', error)
+    logError('Auth:SignIn', error)
     return { data: null, error }
   }
 }
@@ -55,7 +56,7 @@ export const signUp = async (email: string, password: string) => {
     if (error) throw error
     return { data, error: null }
   } catch (error: any) {
-    console.error('Sign up error:', error)
+    logError('Auth:SignUp', error)
     return { data: null, error }
   }
 }
@@ -67,7 +68,7 @@ export const signOut = async () => {
     if (error) throw error
     return { error: null }
   } catch (error: any) {
-    console.error('Sign out error:', error)
+    logError('Auth:SignOut', error)
     return { error }
   }
 }
