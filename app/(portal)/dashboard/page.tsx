@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getCurrentUser, signOut } from '@/lib/auth'
 import { createBrowserClient } from '@/lib/supabase'
+import { ensureTasksForYear } from '@/lib/task-materializer'
 import { calculateHealthScore, formatTaskName } from '@/lib/utils'
 import HealthSpeedometer from '@/components/health-speedometer'
 import ConfirmCompletionModal from '@/components/confirm-completion-modal'
@@ -99,6 +100,11 @@ export default function DashboardPage() {
   // Load available years for this SME
   const loadAvailableYears = async (smeId: string) => {
     const supabase = createBrowserClient()
+    const currentYear = new Date().getFullYear()
+    
+    // Ensure current year has tasks materialized
+    await ensureTasksForYear(smeId, currentYear)
+
     const { data } = await supabase
       .from('sme_compliance_status')
       .select('task_year')
@@ -106,8 +112,13 @@ export default function DashboardPage() {
       .order('task_year', { ascending: false })
 
     if (data) {
-      const years = [...new Set(data.map(item => item.task_year))]
-      setAvailableYears(years.length > 0 ? years : [selectedYear])
+      const yearsSet = new Set(data.map(item => item.task_year))
+      // Always include current year even if it's newly created
+      yearsSet.add(currentYear)
+      const years = Array.from(yearsSet).sort((a, b) => b - a)
+      setAvailableYears(years.length > 0 ? years : [currentYear])
+    } else {
+      setAvailableYears([currentYear])
     }
   }
 

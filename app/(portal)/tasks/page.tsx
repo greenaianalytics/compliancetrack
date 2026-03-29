@@ -4,7 +4,9 @@ import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
 import { createBrowserClient } from '@/lib/supabase'
+import { ensureTasksForYear } from '@/lib/task-materializer'
 import { formatTaskName } from '@/lib/utils'
+import YearSelector from '@/components/year-selector'
 
 interface Task {
   id: string
@@ -16,6 +18,7 @@ interface Task {
   priority: 'high' | 'medium' | 'low'
   is_custom: boolean
   created_by?: string
+  task_year: number
 }
 
 interface TaskFilters {
@@ -30,6 +33,8 @@ export default function TasksPage() {
   const [smeProfile, setSmeProfile] = useState<any>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([])
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [availableYears, setAvailableYears] = useState<number[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [newTask, setNewTask] = useState({
@@ -56,6 +61,13 @@ export default function TasksPage() {
     loadTasksData()
   }, [])
 
+  // Reload tasks when year changes
+  useEffect(() => {
+    if (user && selectedYear) {
+      loadTasks(user.id, selectedYear)
+    }
+  }, [selectedYear])
+
   useEffect(() => {
     filterTasks()
   }, [tasks, filters])
@@ -66,7 +78,7 @@ export default function TasksPage() {
       setUser(currentUser)
 
       if (currentUser) {
-        await loadTasks(currentUser.id)
+        await loadTasks(currentUser.id, selectedYear)
       }
     } catch (error) {
       console.error('Error loading tasks:', error)
@@ -75,7 +87,32 @@ export default function TasksPage() {
     }
   }
 
-  const loadTasks = async (userId: string) => {
+  // Load available years for this SME
+  const loadAvailableYears = async (smeId: string) => {
+    const supabase = createBrowserClient()
+    const currentYear = new Date().getFullYear()
+    
+    // Ensure current year has tasks materialized
+    await ensureTasksForYear(smeId, currentYear)
+
+    const { data } = await supabase
+      .from('sme_compliance_status')
+      .select('task_year')
+      .eq('sme_id', smeId)
+      .order('task_year', { ascending: false })
+
+    if (data) {
+      const yearsSet = new Set(data.map(item => item.task_year))
+      yearsSet.add(currentYear)
+      const years = Array.from(yearsSet).sort((a, b) => b - a)
+      setAvailableYears(years.length > 0 ? years : [currentYear])
+    } else {
+      setAvailableYears([currentYear])
+    }
+  }
+
+  const loadTasks = async (userId: string, year?: number) => {
+    const taskYear = year || selectedYear
     const supabase = createBrowserClient()
     
     const { data: smeProfile, error: profileError } = await supabase
@@ -90,14 +127,16 @@ export default function TasksPage() {
     }
 
     setSmeProfile(smeProfile)
+    await loadAvailableYears(smeProfile.id)
 
-    // Load both compliance tasks and custom tasks
+    // Load both compliance tasks and custom tasks filtered by year
     const { data: complianceTasks, error: complianceError } = await supabase
       .from('sme_compliance_status')
       .select(`
         id,
         status,
         due_date,
+        task_year,
         completed_at,
         compliance_tasks (
           id,
@@ -108,11 +147,13 @@ export default function TasksPage() {
         )
       `)
       .eq('sme_id', smeProfile.id)
+      .eq('task_year', taskYear)
 
     const { data: customTasks, error: customError } = await supabase
       .from('custom_tasks')
       .select('*')
       .eq('sme_id', smeProfile.id)
+      .eq('task_year', taskYear)
 
     if (complianceError) console.error('Error loading compliance tasks:', complianceError)
     if (customError) console.error('Error loading custom tasks:', customError)
@@ -130,7 +171,8 @@ export default function TasksPage() {
             status: task.status,
             category: task.compliance_tasks.category,
             priority: task.compliance_tasks.priority,
-            is_custom: false
+            is_custom: false,
+            task_year: task.task_year
           })
         }
       })
@@ -147,7 +189,8 @@ export default function TasksPage() {
           category: 'Custom',
           priority: 'medium',
           is_custom: true,
-          created_by: task.created_by
+          created_by: task.created_by,
+          task_year: task.task_year || taskYear
         })
       })
     }
@@ -214,7 +257,7 @@ export default function TasksPage() {
       }
     }
 
-    await loadTasks(user.id)
+    await loadTasks(user.id, selectedYear)
   }
 
   const createCustomTask = async () => {
@@ -232,7 +275,8 @@ export default function TasksPage() {
         description: newTask.description,
         due_date: newTask.due_date,
         priority: newTask.priority,
-        status: 'pending'
+        status: 'pending',
+        task_year: selectedYear
       })
 
     if (error) {
@@ -247,7 +291,7 @@ export default function TasksPage() {
         priority: 'medium',
         category: 'Custom'
       })
-      await loadTasks(user.id)
+      await loadTasks(user.id, selectedYear)
     }
   }
 
@@ -289,6 +333,16 @@ export default function TasksPage() {
 
       <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
+          {/* Year Selector */}
+          <div className="mb-6 flex items-center space-x-4">
+            <label className="block text-sm font-medium text-gray-700">Year:</label>
+            <YearSelector 
+              selectedYear={selectedYear} 
+              availableYears={availableYears}
+              onYearChange={setSelectedYear}
+            />
+          </div>
+
           {/* Filters */}
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">

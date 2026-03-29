@@ -86,6 +86,40 @@ function calculateTaskDueDate(frequency: string, dueRule: string, year: number):
 }
 
 /**
+ * Ensure tasks exist for a given year, materialize if needed
+ */
+export async function ensureTasksForYear(smeId: string, year: number) {
+  const supabase = createBrowserClient()
+  
+  // Check if tasks already exist for this year
+  const { data: existingTasks, error: checkError } = await supabase
+    .from('sme_compliance_status')
+    .select('id')
+    .eq('sme_id', smeId)
+    .eq('task_year', year)
+    .limit(1)
+
+  if (checkError) {
+    console.error('Error checking existing tasks:', checkError)
+    return false
+  }
+
+  // If tasks already exist, no need to materialize
+  if (existingTasks && existingTasks.length > 0) {
+    return true
+  }
+
+  // Tasks don't exist for this year, materialize them
+  try {
+    await materializeTasksForYear(smeId, year)
+    return true
+  } catch (error) {
+    console.error(`Failed to materialize tasks for year ${year}:`, error)
+    return false
+  }
+}
+
+/**
  * Check and roll over tasks to next year if needed
  */
 export async function rolloverTasksToNextYear(smeId: string) {
