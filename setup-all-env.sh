@@ -25,26 +25,26 @@ cat > .env.local << 'ENVLOCAL'
 # ============================================
 
 # Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://ntwwwprdpdjqexeszuay.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50d3d3cHJkcGRqcWV4ZXN6dWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTQzODQsImV4cCI6MjA3NzU5MDM4NH0.CYyrfNyWOLQkRWeDOzXzAH9EG_CJ4sSx9X9LyHa0dbU
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50d3d3cHJkcGRqcWV4ZXN6dWF5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjAxNDM4NCwiZXhwIjoyMDc3NTkwMzg0fQ.Ymi0V4rea2SbBCHSbBfFtXZ-dtajYf4YosP0SwGpAmE
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 
 # Authentication (NextAuth.js)
 NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=DgaK0qkk38T5CyN+F/aZtx8T2jUhQXfrTvf1wEw7+dk=
+NEXTAUTH_SECRET=your-nextauth-secret
 
 # Email - Resend (Primary)
-RESEND_API_KEY=re_G49rLWz7_BwbY6q7JeYF4bVCBeQa4Ny8m
-EMAIL_FROM_ADDRESS=noreply@notification.greenaianalytics.org
+RESEND_API_KEY=your-resend-api-key
+EMAIL_FROM_ADDRESS=noreply@yourdomain.com
 EMAIL_FROM_NAME=Compliance Track
 
 # Email - SMTP Fallback (Brevo)
 SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=9f485e001@smtp-brevo.com
-SMTP_PASS=IFaSM7ryJQnjHUWm
-SMTP_FROM=Compliance Track <noreply@notification.greenaianalytics.org>
+SMTP_USER=your-brevo-smtp-user
+SMTP_PASS=your-brevo-smtp-pass
+SMTP_FROM=Compliance Track <noreply@yourdomain.com>
 
 # SMS - 46elks (Optional)
 ELKS_USERNAME=your-elks-username
@@ -72,34 +72,31 @@ cat > .env.production << 'ENVPROD'
 # ============================================
 
 # Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://ntwwwprdpdjqexeszuay.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50d3d3cHJkcGRqcWV4ZXN6dWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTQzODQsImV4cCI6MjA3NzU5MDM4NH0.CYyrfNyWOLQkRWeDOzXzAH9EG_CJ4sSx9X9LyHa0dbU
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50d3d3cHJkcGRqcWV4ZXN6dWF5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjAxNDM4NCwiZXhwIjoyMDc3NTkwMzg0fQ.Ymi0V4rea2SbBCHSbBfFtXZ-dtajYf4YosP0SwGpAmE
+NEXT_PUBLIC_SUPABASE_URL=your-production-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-production-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-production-supabase-service-role-key
 
 # Authentication (NextAuth.js)
 NEXTAUTH_URL=https://www.track.greenaianalytics.org
-NEXTAUTH_SECRET=DgaK0qkk38T5CyN+F/aZtx8T2jUhQXfrTvf1wEw7+dk=
+NEXTAUTH_SECRET=your-production-nextauth-secret
 
 # Email - Resend (Primary)
-RESEND_API_KEY=re_G49rLWz7_BwbY6q7JeYF4bVCBeQa4Ny8m
-EMAIL_FROM_ADDRESS=noreply@notification.greenaianalytics.org
+RESEND_API_KEY=your-production-resend-api-key
+EMAIL_FROM_ADDRESS=noreply@yourdomain.com
 EMAIL_FROM_NAME=Compliance Track
 
 # Email - SMTP Fallback (Brevo)
 SMTP_HOST=smtp-relay.brevo.com
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=9f485e001@smtp-brevo.com
-SMTP_PASS=IFaSM7ryJQnjHUWm
-SMTP_FROM=Compliance Track <noreply@notification.greenaianalytics.org>
+SMTP_USER=your-production-brevo-smtp-user
+SMTP_PASS=your-production-brevo-smtp-pass
+SMTP_FROM=Compliance Track <noreply@yourdomain.com>
 
 # SMS - 46elks (Optional)
-ELKS_USERNAME=your-elks-username
-ELKS_PASSWORD=your-elks-password
+ELKS_USERNAME=your-production-elks-username
+ELKS_PASSWORD=your-production-elks-password
 ELKS_SENDER=ComplianceTrack
-
-# Application
-NODE_ENV=production
 APP_URL=https://www.track.greenaianalytics.org
 
 # Feature Flags
@@ -123,17 +120,17 @@ cat > .env.staging << 'ENVSTAGE'
 # ============================================
 
 # Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=https://ntwwwprdpdjqexeszuay.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50d3d3cHJkcGRqcWV4ZXN6dWF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTQzODQsImV4cCI6MjA3NzU5MDM4NH0.CYyrfNyWOLQkRWeDOzXzAH9EG_CJ4sSx9X9LyHa0dbU
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50d3d3cHJkcGRqcWV4ZXN6dWF5Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjAxNDM4NCwiZXhwIjoyMDc3NTkwMzg0fQ.Ymi0V4rea2SbBCHSbBfFtXZ-dtajYf4YosP0SwGpAmE
+NEXT_PUBLIC_SUPABASE_URL=your-staging-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-staging-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-staging-supabase-service-role-key
 
 # Authentication (NextAuth.js)
 NEXTAUTH_URL=https://staging.track.greenaianalytics.org
-NEXTAUTH_SECRET=generate-different-secret-for-staging
+NEXTAUTH_SECRET=your-staging-nextauth-secret
 
 # Email - Resend (Primary) - Use staging/test API key
-RESEND_API_KEY=re_test_xxxxxxxxxxxxxxxxxxxxxxxxxx
-EMAIL_FROM_ADDRESS=noreply@staging.greenaianalytics.org
+RESEND_API_KEY=your-staging-resend-api-key
+EMAIL_FROM_ADDRESS=noreply@staging.yourdomain.com
 EMAIL_FROM_NAME="Compliance Track (Staging)"
 
 # Application

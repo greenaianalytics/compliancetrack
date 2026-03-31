@@ -6,6 +6,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "vercel:deploy": "vercel --prod",
     "vercel:deploy:staging": "vercel",
     "env:check": "node scripts/check-env.js"

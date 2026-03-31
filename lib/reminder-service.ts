@@ -1,18 +1,19 @@
 import { createServerClient } from './supabase'
 import { sendSMS, smsTemplates } from './sms'
 import { sendEmail, emailTemplates } from './email'
+import { logger } from './logger'
 
 /**
  * Send reminder notifications for upcoming tasks
  */
 export async function sendTaskReminders() {
   const supabase = createServerClient()
-  
+
   try {
     // Get tasks due in the next 7 days
     const nextWeek = new Date()
     nextWeek.setDate(nextWeek.getDate() + 7)
-    
+
     const { data: upcomingTasks, error } = await supabase
       .from('sme_compliance_status')
       .select(`
@@ -40,16 +41,16 @@ export async function sendTaskReminders() {
       .gte('due_date', new Date().toISOString())
 
     if (error) {
-      console.error('Error fetching upcoming tasks:', error)
+      logger.error('Error fetching upcoming tasks', 'ReminderService', error)
       return
     }
 
     if (!upcomingTasks || upcomingTasks.length === 0) {
-      console.log('No upcoming tasks found for reminders')
+      logger.info('No upcoming tasks found for reminders', 'ReminderService')
       return
     }
 
-    console.log(`Found ${upcomingTasks.length} tasks for reminder processing`)
+    logger.info(`Found ${upcomingTasks.length} tasks for reminder processing`, 'ReminderService')
 
     // Process each task and send reminders
     for (const task of upcomingTasks) {
@@ -57,7 +58,7 @@ export async function sendTaskReminders() {
     }
 
   } catch (error) {
-    console.error('Error in sendTaskReminders:', error)
+    logger.error('Error in sendTaskReminders', 'ReminderService', error)
   }
 }
 
@@ -109,12 +110,12 @@ async function sendEmailReminder(email: string, taskName: string, dueDate: strin
     const result = await sendEmail(email, template.subject, template.html)
     
     if (result.success) {
-      console.log(`Email reminder sent to ${email} for task: ${taskName}`)
+      logger.info(`Email reminder sent to ${email} for task: ${taskName}`, 'ReminderService')
     } else {
-      console.error(`Failed to send email to ${email}:`, result.error)
+      logger.error(`Failed to send email to ${email}`, 'ReminderService', result.error)
     }
   } catch (error) {
-    console.error(`Error sending email to ${email}:`, error)
+    logger.error(`Error sending email to ${email}`, 'ReminderService', error)
   }
 }
 
@@ -127,12 +128,12 @@ async function sendSMSReminder(phoneNumber: string, taskName: string, dueDate: s
     const result = await sendSMS(phoneNumber, message)
     
     if (result.success) {
-      console.log(`SMS reminder sent to ${phoneNumber} for task: ${taskName}`)
+      logger.info(`SMS reminder sent to ${phoneNumber} for task: ${taskName}`, 'ReminderService')
     } else {
-      console.error(`Failed to send SMS to ${phoneNumber}:`, result.error)
+      logger.error(`Failed to send SMS to ${phoneNumber}`, 'ReminderService', result.error)
     }
   } catch (error) {
-    console.error(`Error sending SMS to ${phoneNumber}:`, error)
+    logger.error(`Error sending SMS to ${phoneNumber}`, 'ReminderService', error)
   }
 }
 
@@ -171,23 +172,23 @@ export async function sendUrgentTaskNotifications() {
       .gte('due_date', new Date().toISOString().split('T')[0] + 'T00:00:00.000Z')
 
     if (error) {
-      console.error('Error fetching urgent tasks:', error)
+      logger.error('Error fetching urgent tasks', 'ReminderService', error)
       return
     }
 
     if (!urgentTasks || urgentTasks.length === 0) {
-      console.log('No urgent tasks found for today')
+      logger.info('No urgent tasks found for today', 'ReminderService')
       return
     }
 
-    console.log(`Found ${urgentTasks.length} urgent tasks for today`)
+    logger.info(`Found ${urgentTasks.length} urgent tasks for today`, 'ReminderService')
 
     for (const task of urgentTasks) {
       await processUrgentTaskNotification(task)
     }
 
   } catch (error) {
-    console.error('Error in sendUrgentTaskNotifications:', error)
+    logger.error('Error in sendUrgentTaskNotifications', 'ReminderService', error)
   }
 }
 
