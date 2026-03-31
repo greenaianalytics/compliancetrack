@@ -1,4 +1,4 @@
-{
+﻿{
   "version": 2,
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
@@ -22,10 +22,6 @@
       "maxDuration": 60
     }
   },
-  "env": {
-    "NODE_ENV": "production",
-    "ENABLE_EXPERIMENTAL_COREPACK": "1"
-  },
   "regions": ["fra1"],
   "crons": [
     {
@@ -37,51 +33,29 @@
       "schedule": "0 * * * *"
     }
   ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/$1",
-      "headers": {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "X-Requested-With, Content-Type, Authorization"
-      }
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1",
-      "headers": {
-        "X-Frame-Options": "DENY",
-        "X-Content-Type-Options": "nosniff",
-        "Referrer-Policy": "origin-when-cross-origin",
-        "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-        "X-DNS-Prefetch-Control": "on"
-      }
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
         {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
           "key": "X-Frame-Options",
           "value": "DENY"
         },
         {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
         },
         {
           "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
+          "value": "origin-when-cross-origin"
         },
         {
           "key": "Permissions-Policy",
           "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "X-DNS-Prefetch-Control",
+          "value": "on"
         }
       ]
     },
@@ -89,8 +63,16 @@
       "source": "/api/(.*)",
       "headers": [
         {
-          "key": "Cache-Control",
-          "value": "public, max-age=0, must-revalidate"
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "X-Requested-With, Content-Type, Authorization"
         }
       ]
     },
@@ -110,11 +92,5 @@
       "destination": "/admin/login",
       "permanent": false
     }
-  ],
-  "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "develop": true
-    }
-  }
+  ]
 }
