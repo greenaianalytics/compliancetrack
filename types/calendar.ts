@@ -1,6 +1,7 @@
 export interface CalendarTask {
   id: string
   task_name: string
+  description?: string
   due_date: string
   status: 'pending' | 'completed' | 'hidden'
   category: string
